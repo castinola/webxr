@@ -2,42 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Simple WebXR AR Demo</title>
+  <title>WebXR Furniture Placement Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #ui {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+    }
   </style>
 </head>
 <body>
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
-    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js';
+<div id="ui">
+  <button id="scaleUp">+</button>
+  <button id="scaleDown">-</button>
+</div>
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera();
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/webxr/ARButton.js';
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true;
-    document.body.appendChild(renderer.domElement);
+let camera, scene, renderer;
+let furniture;
+let controller;
 
-    // Add AR button
-    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+init();
 
-    // Add a cube
-    const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-    const material = new THREE.MeshNormalMaterial();
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.set(0, 0, -0.5); // half a meter in front
-    scene.add(cube);
+function init() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
 
-    // Animate
-    renderer.setAnimationLoop(() => {
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
-      renderer.render(scene, camera);
-    });
-  </script>
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  scene.add(light);
+
+  // Load furniture model (replace 'chair.glb' with your file)
+  const loader = new GLTFLoader();
+  loader.load('chair.glb', function(gltf) {
+    furniture = gltf.scene;
+    furniture.visible = false;
+    furniture.scale.set(0.5, 0.5, 0.5); // adjust initial size
+    scene.add(furniture);
+  });
+
+  // Controller for taps
+  controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
+
+  // Resize buttons
+  document.getElementById('scaleUp').addEventListener('click', () => {
+    if (furniture) furniture.scale.multiplyScalar(1.1);
+  });
+  document.getElementById('scaleDown').addEventListener('click', () => {
+    if (furniture) furniture.scale.multiplyScalar(0.9);
+  });
+
+  renderer.setAnimationLoop(() => {
+    renderer.render(scene, camera);
+  });
+}
+
+// Place furniture near ceiling when tapped
+function onSelect() {
+  if (furniture) {
+    furniture.position.set(0, 2.5, -1); // 2.5m high, 1m in front
+    furniture.visible = true;
+  }
+}
+</script>
 </body>
 </html>
